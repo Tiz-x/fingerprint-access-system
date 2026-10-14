@@ -1,5 +1,7 @@
+import "dotenv/config";
 import Fastify from "fastify";
 import { bridge } from "./bridge/index.js";
+import { authRoutes } from "./routes/auth.js";
 
 const app = Fastify({ logger: true });
 
@@ -17,20 +19,16 @@ app.addContentTypeParser(
   }
 );
 
+// Health checks
 app.get("/health", async () => ({ ok: true }));
+app.get("/bridge/health", async () => bridge.health());
 
-app.get("/bridge/health", async () => {
-  return await bridge.health();
-});
+// Temporary GET for browser testing. Remove before Phase 5.
+app.get("/bridge/capture", async () => bridge.capture());
+app.post("/bridge/capture", async () => bridge.capture());
 
-// TEMPORARY: GET for browser testing. Remove before Phase 5.
-app.get("/bridge/capture", async () => {
-  return await bridge.capture();
-});
-
-app.post("/bridge/capture", async () => {
-  return await bridge.capture();
-});
+// Auth routes
+await app.register(authRoutes);
 
 app.listen({ port: 3000, host: "127.0.0.1" }).then(() => {
   console.log("API listening on http://127.0.0.1:3000");
