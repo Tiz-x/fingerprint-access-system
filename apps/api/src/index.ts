@@ -5,6 +5,7 @@ import { authRoutes } from "./routes/auth.js";
 import { userRoutes } from "./routes/users.js";
 import { accessRoutes } from "./routes/access.js";
 import { initRealtime } from "./realtime.js";
+import { logRoutes } from "./routes/logs.js";
 
 const app = Fastify({ logger: true });
 
@@ -29,6 +30,7 @@ app.post("/bridge/capture", async () => bridge.capture());
 await app.register(authRoutes);
 await app.register(userRoutes);
 await app.register(accessRoutes);
+await app.register(logRoutes);
 
 await app.ready();
 
