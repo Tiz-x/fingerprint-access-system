@@ -1,0 +1,51 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Admin {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  role      String   @default("user")
+  createdAt DateTime @default(now())
+
+  templates Template[]
+  logs      AccessLog[]
+}
+
+model Template {
+  id        String   @id @default(cuid())
+  userId    String
+  fmd       String   // AES-256-GCM encrypted base64
+  iv        String   // base64 initialization vector
+  authTag   String   // base64 GCM auth tag
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model AccessLog {
+  id        String   @id @default(cuid())
+  timestamp DateTime @default(now())
+  userId    String?
+  result    String   // "GRANTED" | "DENIED"
+  score     Int?
+  reason    String?  // "NO_MATCH" | "POOR_QUALITY" | "DEVICE_NOT_FOUND" etc.
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([timestamp])
+}
