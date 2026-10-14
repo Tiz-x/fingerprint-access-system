@@ -28,29 +28,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState<boolean>(() => Boolean(getToken()));
 
   useEffect(() => {
-    const token = getToken();
-    if (!token) return; // already not loading via initial state
+  const token = getToken();
+  if (!token) return;
 
-    let cancelled = false;
+  let cancelled = false;
 
-    api<{ users: unknown[] }>("/users")
-      .then(() => {
-        if (!cancelled) setAdmin({ id: "self", username: "admin" });
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setToken(null);
-          setAdmin(null);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+  api<{ admin: Admin }>("/auth/me")
+    .then((res) => {
+      if (!cancelled) setAdmin(res.admin);
+    })
+    .catch(() => {
+      if (!cancelled) {
+        setToken(null);
+        setAdmin(null);
+      }
+    })
+    .finally(() => {
+      if (!cancelled) setLoading(false);
+    });
 
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  return () => {
+    cancelled = true;
+  };
+}, []);
 
   async function login(username: string, password: string): Promise<void> {
     const res = await api<{ token: string; admin: Admin }>("/auth/login", {

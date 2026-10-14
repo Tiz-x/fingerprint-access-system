@@ -4,6 +4,7 @@ import { prisma } from "../db.js";
 import { bridge } from "../bridge/index.js";
 import { encryptTemplate } from "../crypto/templates.js";
 import { requireAdmin } from "../auth.js";
+import { logAdminAction } from "../audit.js";
 
 const EnrollBody = z.object({
   name: z.string().min(1).max(100),
@@ -48,22 +49,25 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
         select: { id: true, name: true, role: true, createdAt: true },
       });
 
+      await logAdminAction(
+        req.admin!.adminId,
+        "ENROLL",
+        user.id,
+        `name=${name}`
+      );
+
       return reply.code(201).send({ user, scansUsed: result.scansUsed });
     }
   );
 
   // GET /users — list users, no templates
-  app.get(
-    "/users",
-    { preHandler: requireAdmin },
-    async (_req, reply) => {
-      const users = await prisma.user.findMany({
-        select: { id: true, name: true, role: true, createdAt: true },
-        orderBy: { createdAt: "desc" },
-      });
-      return reply.send({ users });
-    }
-  );
+  app.get("/users", { preHandler: requireAdmin }, async (_req, reply) => {
+    const users = await prisma.user.findMany({
+      select: { id: true, name: true, role: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+    });
+    return reply.send({ users });
+  });
 
   // DELETE /users/:id — delete a user (templates cascade)
   app.delete(
@@ -77,10 +81,17 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
 
       try {
         await prisma.user.delete({ where: { id: params.data.id } });
-        return reply.code(204).send();
       } catch {
         return reply.code(404).send({ error: "User not found" });
       }
+
+      await logAdminAction(
+        req.admin!.adminId,
+        "DELETE_USER",
+        params.data.id
+      );
+
+      return reply.code(204).send();
     }
   );
 }

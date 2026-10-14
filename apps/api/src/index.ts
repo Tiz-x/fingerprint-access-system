@@ -1,11 +1,14 @@
 import "dotenv/config";
 import Fastify from "fastify";
+import rateLimit from "@fastify/rate-limit";
+import cors from "@fastify/cors";
+import helmet from "@fastify/helmet";
 import { bridge } from "./bridge/index.js";
 import { authRoutes } from "./routes/auth.js";
 import { userRoutes } from "./routes/users.js";
 import { accessRoutes } from "./routes/access.js";
-import { initRealtime } from "./realtime.js";
 import { logRoutes } from "./routes/logs.js";
+import { initRealtime } from "./realtime.js";
 
 const app = Fastify({ logger: true });
 
@@ -22,9 +25,19 @@ app.addContentTypeParser(
   }
 );
 
+await app.register(rateLimit, { global: false });
+
+await app.register(cors, {
+  origin: ["http://localhost:5173", "http://127.0.0.1:5173"],
+  credentials: false,
+});
+
+await app.register(helmet, {
+  contentSecurityPolicy: false,
+});
+
 app.get("/health", async () => ({ ok: true }));
 app.get("/bridge/health", async () => bridge.health());
-app.get("/bridge/capture", async () => bridge.capture());
 app.post("/bridge/capture", async () => bridge.capture());
 
 await app.register(authRoutes);

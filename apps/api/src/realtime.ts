@@ -4,9 +4,14 @@ import type { Server as HttpServer } from "node:http";
 let io: SocketServer | null = null;
 
 export function initRealtime(httpServer: HttpServer): SocketServer {
-  io = new SocketServer(httpServer, {
-    cors: { origin: "*" }, // tighten this in Phase 6
-  });
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+];
+
+io = new SocketServer(httpServer, {
+  cors: { origin: allowedOrigins, credentials: false },
+});
 
   io.on("connection", (socket) => {
     console.log(`[ws] client connected: ${socket.id}`);

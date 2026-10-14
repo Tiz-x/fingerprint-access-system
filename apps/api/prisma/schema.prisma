@@ -49,3 +49,14 @@ model AccessLog {
 
   @@index([timestamp])
 }
+
+model AdminAudit {
+  id        String   @id @default(cuid())
+  timestamp DateTime @default(now())
+  adminId   String
+  action    String   // "LOGIN", "ENROLL", "DELETE_USER"
+  target    String?  // e.g. userId for delete
+  details   String?  // free-text JSON
+
+  @@index([timestamp])
+}
