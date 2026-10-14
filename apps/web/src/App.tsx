@@ -1,6 +1,8 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import Login from "./pages/Login";
+import AdminLayout from "../components/AdminLayout";
 import { useAuth } from "./lib/auth";
+import Users from "./pages/Users";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { admin, loading } = useAuth();
@@ -9,22 +11,58 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function Placeholder({ title, hint }: { title: string; hint: string }) {
+  return (
+    <div>
+      <h1 style={{ marginTop: 0 }}>{title}</h1>
+      <p style={{ color: "var(--muted)" }}>{hint}</p>
+    </div>
+  );
+}
+
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/admin/login" replace />} />
       <Route path="/admin/login" element={<Login />} />
+
       <Route
-        path="/admin/users"
+        path="/admin"
         element={
           <RequireAuth>
-            <div style={{ padding: "2rem" }}>
-              <h1>Users</h1>
-              <p style={{ color: "var(--muted)" }}>
-                User management coming in Step 5.9.
-              </p>
-            </div>
+            <AdminLayout />
           </RequireAuth>
+        }
+      >
+        <Route index element={<Navigate to="/admin/users" replace />} />
+        <Route path="users" element={<Users />} />
+        <Route
+          path="enroll"
+          element={
+            <Placeholder
+              title="Enroll User"
+              hint="Enrollment wizard coming in Step 5.10."
+            />
+          }
+        />
+        <Route
+          path="logs"
+          element={
+            <Placeholder
+              title="Access Logs"
+              hint="Log viewer coming in Step 5.11."
+            />
+          }
+        />
+      </Route>
+
+      <Route
+        path="/access"
+        element={
+          <Placeholder
+            title="Access Screen"
+            hint="Full-screen fingerprint access coming in Step 5.12."
+          />
         }
       />
     </Routes>
