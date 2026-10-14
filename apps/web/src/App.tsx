@@ -3,6 +3,7 @@ import Login from "./pages/Login";
 import AdminLayout from "../components/AdminLayout";
 import { useAuth } from "./lib/auth";
 import Users from "./pages/Users";
+import Enroll from "./pages/Enroll";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { admin, loading } = useAuth();
@@ -36,15 +37,7 @@ export default function App() {
       >
         <Route index element={<Navigate to="/admin/users" replace />} />
         <Route path="users" element={<Users />} />
-        <Route
-          path="enroll"
-          element={
-            <Placeholder
-              title="Enroll User"
-              hint="Enrollment wizard coming in Step 5.10."
-            />
-          }
-        />
+        <Route path="enroll" element={<Enroll />} />
         <Route
           path="logs"
           element={
