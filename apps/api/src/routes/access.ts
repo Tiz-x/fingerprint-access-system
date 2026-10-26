@@ -19,13 +19,24 @@ export async function accessRoutes(app: FastifyInstance): Promise<void> {
       // 1. Capture a finger via the bridge
       const capture = await bridge.capture();
       if (!capture.ok) {
+        // Nobody touched the scanner, or the scanner is offline. That isn't an
+        // access attempt, so don't log it or announce a denial.
+        const notAnAttempt = [
+          "NO_FINGER",
+          "TIMEOUT",
+          "BRIDGE_UNREACHABLE",
+          "DEVICE_NOT_FOUND",
+          "BRIDGE_ERROR",
+        ];
+        if (notAnAttempt.includes(capture.error)) {
+          return reply.code(200).send({ granted: false, reason: capture.error });
+        }
+
         await prisma.accessLog.create({
           data: { result: "DENIED", reason: capture.error },
         });
         emitDenied({ granted: false, reason: capture.error, timestamp });
-        return reply
-          .code(200)
-          .send({ granted: false, reason: capture.error });
+        return reply.code(200).send({ granted: false, reason: capture.error });
       }
 
       // 2. Load all templates, decrypt them

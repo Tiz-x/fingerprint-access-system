@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, type FormEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Fingerprint, LogIn } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { ApiError } from "../lib/api";
 
@@ -12,18 +13,18 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setBusy(true);
     try {
       await login(username, password);
-      navigate("/admin/users");
+      navigate("/admin/dashboard");
     } catch (err) {
       if (err instanceof ApiError) {
-        setError(err.status === 401 ? "Invalid credentials" : err.message);
+        setError(err.status === 401 ? "That username or password is wrong." : err.message);
       } else {
-        setError("Network error. Is the API running?");
+        setError("Couldn't reach the access service. Check that it is running.");
       }
     } finally {
       setBusy(false);
@@ -31,71 +32,70 @@ export default function Login() {
   }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "1rem",
-      }}
-    >
-      <form
-        onSubmit={handleSubmit}
-        className="card"
-        style={{ width: "100%", maxWidth: 380 }}
-      >
-        <h1 style={{ margin: "0 0 0.5rem" }}>Admin Login</h1>
-        <p style={{ color: "var(--muted)", marginTop: 0, marginBottom: "1.5rem" }}>
-          Fingerprint Access Control
-        </p>
-
-        <label style={{ display: "block", marginBottom: "1rem" }}>
-          <span style={{ display: "block", marginBottom: 4, fontSize: 14 }}>
-            Username
+    <div className="login">
+      <aside className="login-brand">
+        <div className="brand" style={{ padding: 0 }}>
+          <span className="brand-mark">
+            <Fingerprint size={22} strokeWidth={1.75} aria-hidden="true" />
           </span>
-          <input
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            autoFocus
-            autoComplete="username"
-            required
-          />
-        </label>
-
-        <label style={{ display: "block", marginBottom: "1.5rem" }}>
-          <span style={{ display: "block", marginBottom: 4, fontSize: 14 }}>
-            Password
-          </span>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
-            required
-          />
-        </label>
-
-        {error && (
-          <div
-            style={{
-              background: "rgba(239,68,68,0.1)",
-              border: "1px solid var(--danger)",
-              color: "var(--danger)",
-              padding: "0.6rem 0.8rem",
-              borderRadius: 6,
-              marginBottom: "1rem",
-              fontSize: 14,
-            }}
-          >
-            {error}
+          <div>
+            <div className="brand-name">Fingerprint access</div>
+            <div className="brand-sub">Administration</div>
           </div>
-        )}
+        </div>
+        <div>
+          <h2 className="login-statement">Only enrolled fingerprints open the door.</h2>
+          <p className="login-note">
+            Enroll people, review every attempt, and remove access the moment it is no longer needed.
+          </p>
+        </div>
+        <span />
+      </aside>
 
-        <button type="submit" disabled={busy} style={{ width: "100%" }}>
-          {busy ? "Signing in..." : "Sign in"}
-        </button>
-      </form>
+      <div className="login-form-wrap">
+        <form className="login-form" onSubmit={handleSubmit}>
+          <h1>Administrator sign in</h1>
+          <p className="page-sub">Use the account you were given to manage access.</p>
+
+          <label className="field">
+            <span className="field-label">Username</span>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              autoComplete="username"
+              autoFocus
+              required
+            />
+          </label>
+
+          <label className="field">
+            <span className="field-label">Password</span>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              required
+            />
+          </label>
+
+          {error && (
+            <div className="notice-bad" role="alert">
+              {error}
+            </div>
+          )}
+
+          <button className="btn btn-block" type="submit" disabled={busy}>
+            <LogIn size={18} aria-hidden="true" />
+            {busy ? "Signing in..." : "Sign in"}
+          </button>
+
+          <Link to="/access" className="login-back">
+            Go to the access screen
+          </Link>
+        </form>
+      </div>
     </div>
   );
 }

@@ -11,16 +11,18 @@ export function setToken(token: string | null): void {
 
 export class ApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  data: unknown;
+  constructor(status: number, message: string, data?: unknown) {
     super(message);
     this.status = status;
+    this.data = data;
   }
 }
 
 interface RequestOptions {
   method?: string;
   body?: unknown;
-  auth?: boolean; // attach JWT if available (default: true)
+  auth?: boolean; 
 }
 
 export async function api<T>(
@@ -53,7 +55,7 @@ export async function api<T>(
 
   if (!res.ok) {
     const message = data?.error ?? res.statusText;
-    throw new ApiError(res.status, message);
+    throw new ApiError(res.status, message, data);
   }
 
   return data as T;

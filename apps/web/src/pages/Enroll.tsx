@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState, type FormEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { CircleCheck, Fingerprint } from "lucide-react";
 import { api, ApiError } from "../lib/api";
 
 type Phase = "form" | "scanning" | "done" | "error";
@@ -9,6 +10,26 @@ interface CreatedUser {
   name: string;
   role: string;
   createdAt: string;
+}
+
+const SCAN_CHOICES = [3, 4, 5, 6];
+
+function explain(err: unknown): string {
+  if (!(err instanceof ApiError)) return "Couldn't reach the access service. Check that it is running.";
+  const reason = (err.data as { reason?: string } | null)?.reason;
+  switch (reason) {
+    case "NO_FINGER":
+    case "TIMEOUT":
+      return "No finger was detected in time. Press your finger on the scanner as soon as the scanner window appears.";
+    case "POOR_QUALITY":
+      return "One of the scans was too unclear. Press flat and firmly, and keep the finger still.";
+    case "BRIDGE_UNREACHABLE":
+      return "The scanner bridge isn't running on this computer. Start it, then try again.";
+    case "DEVICE_NOT_FOUND":
+      return "The fingerprint reader isn't connected. Plug it into a USB port and try again.";
+    default:
+      return err.message;
+  }
 }
 
 export default function Enroll() {
@@ -21,30 +42,34 @@ export default function Enroll() {
   const [phase, setPhase] = useState<Phase>("form");
   const [error, setError] = useState<string | null>(null);
   const [created, setCreated] = useState<CreatedUser | null>(null);
+  const [elapsed, setElapsed] = useState(0);
 
-  async function handleSubmit(e: React.FormEvent) {
+  useEffect(() => {
+    if (phase !== "scanning") return;
+    const start = Date.now();
+    const timer = window.setInterval(() => {
+      setElapsed(Math.floor((Date.now() - start) / 1000));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [phase]);
+
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
 
-    setPhase("scanning");
+    setElapsed(0);
     setError(null);
+    setPhase("scanning");
 
     try {
-      const res = await api<{ user: CreatedUser; scansUsed: number }>(
-        "/users/enroll",
-        {
-          method: "POST",
-          body: { name: name.trim(), role, scans },
-        }
-      );
+      const res = await api<{ user: CreatedUser; scansUsed: number }>("/users/enroll", {
+        method: "POST",
+        body: { name: name.trim(), role, scans },
+      });
       setCreated(res.user);
       setPhase("done");
     } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.message);
-      } else {
-        setError("Enrollment failed. Is the API running?");
-      }
+      setError(explain(err));
       setPhase("error");
     }
   }
@@ -59,32 +84,31 @@ export default function Enroll() {
   }
 
   return (
-    <div>
-      <h1 style={{ marginTop: 0 }}>Enroll User</h1>
+    <div className="enroll-wrap">
+      <div className="page-head">
+        <div>
+          <h1>Enroll a user</h1>
+          <p className="page-sub">Scan a finger so this person can open the door.</p>
+        </div>
+      </div>
 
       {phase === "form" && (
-        <form
-          onSubmit={handleSubmit}
-          className="card"
-          style={{ maxWidth: 480 }}
-        >
-          <label style={{ display: "block", marginBottom: "1rem" }}>
-            <span style={{ display: "block", marginBottom: 4, fontSize: 14 }}>
-              Full name
-            </span>
+        <form className="panel panel-body" onSubmit={handleSubmit}>
+          <label className="field">
+            <span className="field-label">Full name</span>
             <input
+              type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Alice Smith"
+              placeholder="For example, Amina Okafor"
+              maxLength={100}
               autoFocus
               required
             />
           </label>
 
-          <label style={{ display: "block", marginBottom: "1rem" }}>
-            <span style={{ display: "block", marginBottom: 4, fontSize: 14 }}>
-              Role
-            </span>
+          <label className="field">
+            <span className="field-label">Role</span>
             <select value={role} onChange={(e) => setRole(e.target.value)}>
               <option value="user">User</option>
               <option value="staff">Staff</option>
@@ -92,113 +116,93 @@ export default function Enroll() {
             </select>
           </label>
 
-          <label style={{ display: "block", marginBottom: "1.5rem" }}>
-            <span style={{ display: "block", marginBottom: 4, fontSize: 14 }}>
-              Number of scans ({scans})
+          <div className="field">
+            <span className="field-label" id="scan-label">
+              Number of scans
             </span>
-            <input
-              type="range"
-              min={1}
-              max={10}
-              value={scans}
-              onChange={(e) => setScans(Number(e.target.value))}
-            />
-            <div style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}>
-              More scans = stronger template. 4 is a good balance.
+            <div className="segmented" role="group" aria-labelledby="scan-label">
+              {SCAN_CHOICES.map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  className={scans === n ? "is-on" : ""}
+                  aria-pressed={scans === n}
+                  onClick={() => setScans(n)}
+                >
+                  {n}
+                </button>
+              ))}
             </div>
-          </label>
+            <span className="hint">More scans make a more reliable match. Four is a good balance.</span>
+          </div>
 
-          <button type="submit" disabled={!name.trim()}>
-            Start Enrollment
+          <p className="hint" style={{ marginBottom: "1.25rem" }}>
+            Close the access screen on this computer first. It keeps the scanner busy and can steal a scan.
+          </p>
+
+          <button className="btn" type="submit" disabled={!name.trim()}>
+            <Fingerprint size={18} aria-hidden="true" />
+            Start scanning
           </button>
         </form>
       )}
 
       {phase === "scanning" && (
-        <div
-          className="card"
-          style={{
-            maxWidth: 480,
-            textAlign: "center",
-            padding: "3rem 2rem",
-          }}
-        >
-          <div
-            style={{
-              fontSize: 56,
-              marginBottom: "1rem",
-              animation: "pulse 1.2s ease-in-out infinite",
-            }}
-          >
-            ☝
+        <div className="panel panel-body" aria-live="polite">
+          <div className="scan-head">
+            <Fingerprint size={44} strokeWidth={1.25} className="pulse" aria-hidden="true" />
+            <div>
+              <h2>Scanning {name}</h2>
+              <p className="hint num">
+                {scans} scans, {elapsed} s elapsed
+              </p>
+            </div>
           </div>
-          <h2 style={{ margin: "0 0 0.5rem" }}>Place finger on scanner</h2>
-          <p style={{ color: "var(--muted)", margin: 0 }}>
-            Capturing {scans} scan{scans === 1 ? "" : "s"} for {name}...
-          </p>
-          <style>{`
-            @keyframes pulse {
-              0%, 100% { opacity: 0.4; }
-              50% { opacity: 1; }
-            }
-          `}</style>
+          <ol className="steps">
+            <li>A small "Scanner ready" window appears in the bottom-right corner of the screen.</li>
+            <li>Press the finger flat on the glass and hold it for about two seconds.</li>
+            <li>Lift it completely, then place the same finger again when the window reappears.</li>
+            <li>Repeat until all {scans} scans are done. This page updates by itself.</li>
+          </ol>
         </div>
       )}
 
       {phase === "done" && created && (
-        <div className="card" style={{ maxWidth: 480 }}>
-          <div
-            style={{
-              display: "inline-block",
-              background: "rgba(34,197,94,0.15)",
-              color: "var(--success)",
-              padding: "0.3rem 0.7rem",
-              borderRadius: 6,
-              fontSize: 13,
-              marginBottom: "1rem",
-            }}
-          >
-            Enrolled
+        <div className="panel panel-body">
+          <div className="done-head">
+            <CircleCheck size={22} aria-hidden="true" />
+            {created.name} is enrolled
           </div>
-          <h2 style={{ margin: "0 0 0.5rem" }}>{created.name}</h2>
-          <p style={{ color: "var(--muted)", marginTop: 0 }}>
-            Role: {created.role}
-          </p>
-          <p style={{ color: "var(--muted)", fontSize: 14 }}>
-            ID: <code>{created.id}</code>
-          </p>
-
-          <div style={{ display: "flex", gap: "0.5rem", marginTop: "1.5rem" }}>
-            <button onClick={() => navigate("/admin/users")}>
-              Back to Users
+          <dl className="kv">
+            <dt>Role</dt>
+            <dd style={{ textTransform: "capitalize" }}>{created.role}</dd>
+            <dt>ID</dt>
+            <dd className="num">{created.id}</dd>
+          </dl>
+          <div className="actions">
+            <button className="btn" onClick={() => navigate("/admin/users")}>
+              View users
             </button>
-            <button className="secondary" onClick={reset}>
-              Enroll Another
+            <button className="btn btn-quiet" onClick={reset}>
+              Enroll another person
             </button>
           </div>
         </div>
       )}
 
       {phase === "error" && (
-        <div className="card" style={{ maxWidth: 480 }}>
-          <div
-            style={{
-              background: "rgba(239,68,68,0.1)",
-              border: "1px solid var(--danger)",
-              color: "var(--danger)",
-              padding: "0.8rem 1rem",
-              borderRadius: 6,
-              marginBottom: "1rem",
-            }}
-          >
+        <div className="panel panel-body">
+          <div className="notice-bad" role="alert">
             {error}
           </div>
-          <p style={{ color: "var(--muted)", fontSize: 14 }}>
-            Check that the API and scanner bridge are running, then try again.
-          </p>
-          <button className="secondary" onClick={reset}>
-            Try Again
-          </button>
+          <div className="actions" style={{ marginTop: 0 }}>
+            <button className="btn" onClick={() => setPhase("form")}>
+              Try again
+            </button>
+            <Link to="/admin/users" className="btn btn-quiet">
+              Back to users
+            </Link>
+          </div>
         </div>
       )}
     </div>

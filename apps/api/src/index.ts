@@ -9,6 +9,7 @@ import { userRoutes } from "./routes/users.js";
 import { accessRoutes } from "./routes/access.js";
 import { logRoutes } from "./routes/logs.js";
 import { initRealtime } from "./realtime.js";
+import { requireAdmin } from "./auth.js";
 
 const app = Fastify({ logger: true });
 
@@ -38,7 +39,7 @@ await app.register(helmet, {
 
 app.get("/health", async () => ({ ok: true }));
 app.get("/bridge/health", async () => bridge.health());
-app.post("/bridge/capture", async () => bridge.capture());
+app.post("/bridge/capture", { preHandler: requireAdmin }, async () => bridge.capture());
 
 await app.register(authRoutes);
 await app.register(userRoutes);

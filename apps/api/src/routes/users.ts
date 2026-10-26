@@ -9,7 +9,7 @@ import { logAdminAction } from "../audit.js";
 const EnrollBody = z.object({
   name: z.string().min(1).max(100),
   role: z.string().min(1).max(50).default("user"),
-  scans: z.number().int().min(1).max(10).default(4),
+  scans: z.number().int().min(2).max(8).default(4),
 });
 
 export async function userRoutes(app: FastifyInstance): Promise<void> {
