@@ -64,4 +64,8 @@ export const fakeBridge: BridgeClient = {
   async health(): Promise<HealthResult> {
     return { ok: true, deviceConnected: true, sdkVersion: "fake-1.0.0" };
   },
+
+  async cancelScan(): Promise<void> {
+    // No-op for the fake bridge.
+  },
 };

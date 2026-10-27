@@ -70,11 +70,11 @@ class CaptureWorkerForm : Form
     public CaptureWorkerForm()
     {
         Text = "Scanner ready";
-Width = 300;
-Height = 110;
-StartPosition = FormStartPosition.Manual;
-var area = Screen.PrimaryScreen.WorkingArea;
-Location = new Point(area.Right - Width - 16, area.Bottom - Height - 16);
+        Width = 300;
+        Height = 110;
+        StartPosition = FormStartPosition.Manual;
+        var area = Screen.PrimaryScreen.WorkingArea;
+        Location = new Point(area.Right - Width - 16, area.Bottom - Height - 16);
         Controls.Add(label);
         handler = new Reader.CaptureCallback(OnCaptured);
         
@@ -87,6 +87,19 @@ Location = new Point(area.Right - Width - 16, area.Bottom - Height - 16);
     {
         try
         {
+            // Change A: Watch stdin for cancellation
+            var cancelWatcher = new Thread(() =>
+            {
+                try
+                {
+                    string line;
+                    while ((line = Console.In.ReadLine()) != null)
+                        if (line == "CANCEL") { Finish("ERROR:CANCELLED"); break; }
+                }
+                catch { }
+            }) { IsBackground = true };
+            cancelWatcher.Start();
+
             readers = ReaderCollection.GetReaders();
             if (readers.Count == 0) { Finish("ERROR:DEVICE_NOT_FOUND"); return; }
             reader = readers[0];
@@ -166,6 +179,11 @@ class BridgeForm : Form
     HttpListener listener;
     readonly Label statusLabel = new Label { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter };
 
+    // Change B: Cancellation fields
+    int cancelGeneration;
+    Process currentWorker;
+    readonly object workerLock = new object();
+
     public BridgeForm()
     {
         Text = "Fingerprint Bridge";
@@ -204,38 +222,75 @@ class BridgeForm : Form
         catch { return false; }
     }
 
+    // Change C: Updated CaptureToFmd with cancellation support
     async Task<FmdOutcome> CaptureToFmd(int timeoutMs)
     {
+        int gen = Volatile.Read(ref cancelGeneration);
         await gate.WaitAsync();   // one capture at a time
         try
         {
+            if (Volatile.Read(ref cancelGeneration) != gen)
+                return new FmdOutcome { Error = "CANCELLED" };
+
             string result = null, error = null;
             var psi = new ProcessStartInfo(Application.ExecutablePath, "--capture")
-            { UseShellExecute = false, RedirectStandardOutput = true, CreateNoWindow = true };
+            {
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardInput = true,
+                CreateNoWindow = true
+            };
 
             using (var p = Process.Start(psi))
             {
-                var reading = Task.Run(() =>
+                lock (workerLock) currentWorker = p;
+                try
                 {
-                    string line;
-                    while ((line = p.StandardOutput.ReadLine()) != null)
+                    var reading = Task.Run(() =>
                     {
-                        if (line == "READY") { Log("Place finger now..."); SetStatus(">>> PLACE FINGER NOW <<<"); }
-                        else if (line.StartsWith("RESULT:")) { result = line.Substring(7); Log("Captured OK"); }
-                        else if (line.StartsWith("ERROR:")) { error = line.Substring(6); Log("Worker error: " + error); }
-                    }
-                });
+                        string line;
+                        while ((line = p.StandardOutput.ReadLine()) != null)
+                        {
+                            if (line == "READY") { Log("Place finger now..."); SetStatus(">>> PLACE FINGER NOW <<<"); }
+                            else if (line.StartsWith("RESULT:")) { result = line.Substring(7); Log("Captured OK"); }
+                            else if (line.StartsWith("ERROR:")) { error = line.Substring(6); Log("Worker error: " + error); }
+                        }
+                    });
 
-                bool exited = await Task.Run(() => p.WaitForExit(timeoutMs));
-                if (!exited) { try { p.Kill(); } catch { } error = "WORKER_TIMEOUT"; }
-                await Task.WhenAny(reading, Task.Delay(2000));
+                    bool exited = await Task.Run(() => p.WaitForExit(timeoutMs));
+                    if (!exited) { try { p.Kill(); } catch { } error = "WORKER_TIMEOUT"; }
+                    await Task.WhenAny(reading, Task.Delay(2000));
+                }
+                finally
+                {
+                    lock (workerLock) currentWorker = null;
+                }
             }
 
             SetStatus("Bridge running on 8765");
             if (result != null) return new FmdOutcome { B64 = result };
+            if (Volatile.Read(ref cancelGeneration) != gen) return new FmdOutcome { Error = "CANCELLED" };
             return new FmdOutcome { Error = error ?? "NO_RESULT" };
         }
         finally { gate.Release(); }
+    }
+
+    // Change D: CancelCurrentScan
+    void CancelCurrentScan()
+    {
+        Interlocked.Increment(ref cancelGeneration);
+        Process p;
+        lock (workerLock) p = currentWorker;
+        if (p == null) return;
+
+        try { p.StandardInput.WriteLine("CANCEL"); p.StandardInput.Flush(); } catch { }
+
+        // If it hasn't closed itself after 2.5 s, end it.
+        Task.Run(async () =>
+        {
+            await Task.Delay(2500);
+            try { if (!p.HasExited) p.Kill(); } catch { }
+        });
     }
 
     static Fmd Base64ToFmd(string b64)
@@ -385,6 +440,8 @@ class BridgeForm : Form
             else if (path == "/capture" && method == "POST") result = await DoCapture();
             else if (path == "/enroll" && method == "POST") result = await DoEnroll(body);
             else if (path == "/identify" && method == "POST") result = DoIdentify(body);
+            // Change E: /cancel endpoint
+            else if (path == "/cancel" && method == "POST") { CancelCurrentScan(); result = new { ok = true }; }
             else { Respond(ctx, 404, Err("NOT_FOUND")); return; }
 
             Respond(ctx, 200, result);

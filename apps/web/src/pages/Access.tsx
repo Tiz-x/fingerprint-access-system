@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
+  ArrowLeft,
   Check,
   CircleAlert,
   Fingerprint,
@@ -30,6 +31,16 @@ interface VerifyResponse {
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+// Tells the bridge to stop waiting for a finger and close the small scanner window.
+function releaseScanner() {
+  void fetch("/api/access/cancel", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{}",
+    keepalive: true, // lets the request finish even while the page is closing
+  }).catch(() => {});
+}
 
 // Open /access?preview=granted (or denied, unclear, empty, offline, ready)
 // to look at a screen without scanning anything.
@@ -152,6 +163,13 @@ export default function Access() {
   const [view, setView] = useState<View>(PREVIEW ?? { kind: "ready" });
   const mounted = useRef(false);
   const running = useRef(false);
+  const navigate = useNavigate();
+
+  function goBack() {
+    mounted.current = false;
+    releaseScanner();
+    navigate("/admin");
+  }
 
   async function runLoop() {
     while (mounted.current) {
@@ -217,8 +235,11 @@ export default function Access() {
       running.current = true;
       void runLoop();
     }
+    window.addEventListener("pagehide", releaseScanner);
     return () => {
       mounted.current = false;
+      window.removeEventListener("pagehide", releaseScanner);
+      releaseScanner();
     };
   }, []);
 
@@ -255,7 +276,10 @@ export default function Access() {
         </section>
 
         <footer className="kiosk-foot">
-          <Link to="/admin">Administration</Link>
+          <button type="button" className="kiosk-back" onClick={goBack}>
+            <ArrowLeft size={18} aria-hidden="true" />
+            Back to administration
+          </button>
         </footer>
       </div>
 

@@ -29,4 +29,5 @@ export interface BridgeClient {
   enroll(scans: number): Promise<EnrollResult>;
   identify(probe: string, candidates: { userId: string; fmd: string }[]): Promise<IdentifyResult>;
   health(): Promise<HealthResult>;
+  cancelScan(): Promise<void>;
 }

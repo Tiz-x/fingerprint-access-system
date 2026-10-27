@@ -35,6 +35,10 @@ async function call(
 // Translate the C# bridge's error strings into the codes the rest of the API uses.
 function mapError(code?: string): BridgeErrorCode {
   const c = code ?? "";
+  
+  // Treat a cancelled scan the same as no finger being placed
+  if (c === "CANCELLED") return "NO_FINGER";
+  
   if (c === "TIMEOUT_NO_FINGER") return "NO_FINGER";
   if (c === "WORKER_TIMEOUT" || c === "BRIDGE_TIMEOUT") return "TIMEOUT";
   if (c.startsWith("POOR_QUALITY")) return "POOR_QUALITY";
@@ -74,5 +78,9 @@ export const realBridge: BridgeClient = {
     const r = await call("/health", "GET", undefined, 10_000);
     if (!r.ok) return { ok: true, deviceConnected: false, sdkVersion: "bridge-offline" };
     return { ok: true, deviceConnected: !!r.deviceConnected, sdkVersion: String(r.sdkVersion ?? "unknown") };
+  },
+
+  async cancelScan(): Promise<void> {
+    await call("/cancel", "POST", {}, 5_000);
   },
 };

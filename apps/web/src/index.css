@@ -475,3 +475,22 @@ input:focus-visible, select:focus-visible { outline-offset: 0; border-color: var
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
+
+
+
+.kiosk-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 0.55rem 1rem;
+  border: 1px solid var(--k-steel);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--k-ink);
+  cursor: pointer;
+}
+.kiosk-back:hover { background: rgba(28, 35, 41, 0.08); }
+.kiosk-back:focus-visible { outline: 2px solid var(--k-brass); outline-offset: 2px; }

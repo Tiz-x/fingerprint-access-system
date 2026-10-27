@@ -116,4 +116,14 @@ export async function accessRoutes(app: FastifyInstance): Promise<void> {
       });
     }
   );
+
+  // Route to abort a hanging scan (e.g., if the user walks away)
+  app.post(
+    "/access/cancel",
+    { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } },
+    async (_req, reply) => {
+      await bridge.cancelScan();
+      return reply.send({ ok: true });
+    }
+  );
 }
