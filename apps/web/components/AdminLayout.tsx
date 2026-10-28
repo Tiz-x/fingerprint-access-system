@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   DoorOpen,
@@ -20,8 +21,14 @@ const nav = [
 export default function AdminLayout() {
   const { admin, logout } = useAuth();
   const navigate = useNavigate();
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   function handleLogout() {
+    setShowLogoutModal(true);
+  }
+
+  function confirmLogout() {
+    setShowLogoutModal(false);
     logout();
     navigate("/admin/login");
   }
@@ -50,9 +57,9 @@ export default function AdminLayout() {
 
         <div className="sidebar-foot">
           <Link className="kiosk-link" to="/access">
-  <DoorOpen size={18} aria-hidden="true" />
-  Open the access screen
-</Link>
+            <DoorOpen size={18} aria-hidden="true" />
+            Open the access screen
+          </Link>
           <div className="whoami">
             <div>
               <div className="whoami-name">{admin?.username ?? ""}</div>
@@ -70,6 +77,58 @@ export default function AdminLayout() {
           <Outlet />
         </main>
       </div>
+
+            {/* Logout Confirmation Modal */}
+      {showLogoutModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 0, 0, 0.7)", // Darker overlay
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            backdropFilter: "blur(4px)", // Smooth glass effect
+          }}
+          onClick={() => setShowLogoutModal(false)}
+        >
+          <div
+            style={{
+              width: "100%",
+              maxWidth: 400,
+              margin: "1rem",
+              background: "#1e293b", 
+              border: "1px solid #334155",
+              borderRadius: "12px",
+              padding: "1.5rem",
+              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.5)", // Deep shadow
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 style={{ margin: 0, fontSize: 20, color: "white" }}>Sign out?</h2>
+            <p style={{ color: "#94a3b8", marginTop: "0.75rem", marginBottom: "1.5rem", lineHeight: 1.5 }}>
+              Are you sure you want to sign out of the administration panel?
+            </p>
+            <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
+              <button 
+                className="btn btn-quiet" 
+                onClick={() => setShowLogoutModal(false)}
+                style={{ padding: "0.5rem 1rem" }}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn" 
+                onClick={confirmLogout} 
+                style={{ background: "red", color: "white", padding: "0.5rem 1rem", border: "none" }}
+              >
+                Yes, sign out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { bridge } from "../bridge/index.js";
 import { encryptTemplate } from "../crypto/templates.js";
 import { requireAdmin } from "../auth.js";
 import { logAdminAction } from "../audit.js";
+import { findDuplicate } from "../enrollCheck.js";
 
 const EnrollBody = z.object({
   name: z.string().min(1).max(100),
@@ -23,14 +24,45 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
         return reply.code(400).send({ error: "Invalid request body" });
       }
       const { name, role, scans } = parsed.data;
+const adminId = req.admin!.adminId;
 
-      const result = await bridge.enroll(scans);
-      if (!result.ok) {
-        return reply.code(502).send({
-          error: "Enrollment failed at scanner",
-          reason: result.error,
-        });
-      }
+async function rejectDuplicate(dup: { userId: string; name: string }) {
+  await logAdminAction(adminId, "ENROLL_BLOCKED_DUPLICATE", dup.userId, `attempted name=${name}`);
+  return reply.code(409).send({
+    error: `This fingerprint is already enrolled as ${dup.name}`,
+    reason: "ALREADY_ENROLLED",
+    existingName: dup.name,
+  });
+}
+
+// 1. One quick scan first: is this finger already enrolled?
+const probe = await bridge.capture();
+if (!probe.ok) {
+  return reply.code(502).send({ error: "Couldn't read the finger", reason: probe.error });
+}
+try {
+  const dup = await findDuplicate(probe.fmd);
+  if (dup) return await rejectDuplicate(dup);
+} catch {
+  return reply.code(502).send({ error: "Couldn't check existing fingerprints", reason: "BRIDGE_ERROR" });
+}
+
+// 2. Now the full enrollment scans
+const result = await bridge.enroll(scans);
+if (!result.ok) {
+  return reply.code(502).send({
+    error: "Enrollment failed at scanner",
+    reason: result.error,
+  });
+}
+
+// 3. Safety net: the finger might have been swapped during the enrollment scans
+try {
+  const dup = await findDuplicate(result.fmd);
+  if (dup) return await rejectDuplicate(dup);
+} catch {
+  return reply.code(502).send({ error: "Couldn't check existing fingerprints", reason: "BRIDGE_ERROR" });
+}
 
       const enc = encryptTemplate(result.fmd);
 

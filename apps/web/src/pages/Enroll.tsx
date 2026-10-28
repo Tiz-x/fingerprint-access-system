@@ -27,6 +27,12 @@ function explain(err: unknown): string {
       return "The scanner bridge isn't running on this computer. Start it, then try again.";
     case "DEVICE_NOT_FOUND":
       return "The fingerprint reader isn't connected. Plug it into a USB port and try again.";
+    case "ALREADY_ENROLLED": {
+      const who = (err.data as { existingName?: string } | null)?.existingName;
+      return who
+        ? `This fingerprint is already enrolled as ${who}. Each finger can belong to only one person. Use a different finger, or delete ${who} first.`
+        : "This fingerprint is already enrolled. Each finger can belong to only one person.";
+    }
     default:
       return err.message;
   }
@@ -159,6 +165,7 @@ export default function Enroll() {
             </div>
           </div>
           <ol className="steps">
+            <li>First, one scan checks that this finger isn't already enrolled.</li>
             <li>A small "Scanner ready" window appears in the bottom-right corner of the screen.</li>
             <li>Press the finger flat on the glass and hold it for about two seconds.</li>
             <li>Lift it completely, then place the same finger again when the window reappears.</li>
