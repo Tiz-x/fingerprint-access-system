@@ -313,26 +313,24 @@ class BridgeForm : Form
         return new { ok = true, fmd = r.B64, quality = "DP_QUALITY_GOOD" };
     }
 
-    async Task<object> DoEnroll(JObject body)
+        async Task<object> DoEnroll(JObject body)
     {
-        int scans = 4;
-        var sv = Get(body, "scans");
-        if (sv != null) scans = (int)sv;
-        if (scans < 2 || scans > 8) return Err("INVALID_SCAN_COUNT");
-
-        var fmds = new List<Fmd>();
+        // Always capture 10 fingers
+        int scans = 10; 
+        
+        var results = new List<string>();
         for (int i = 0; i < scans; i++)
         {
-            Log("Enroll scan " + (i + 1) + " of " + scans);
+            Log($"Enroll scan {i + 1} of {scans}");
             var r = await CaptureToFmd(35000);
             if (r.Error != null) return Err(r.Error);
-            fmds.Add(Base64ToFmd(r.B64));
-            await Task.Delay(1200);   // time to lift the finger
+            
+            results.Add(r.B64);
+            await Task.Delay(800); // time to lift finger
         }
 
-        var enr = Enrollment.CreateEnrollmentFmd(Constants.Formats.Fmd.ANSI, fmds);
-        if (enr.ResultCode != Constants.ResultCode.DP_SUCCESS) return Err(enr.ResultCode.ToString());
-        return new { ok = true, fmd = FmdToBase64(enr.Data), scansUsed = scans };
+        // Return an array of 10 distinct templates
+        return new { ok = true, fmds = results, scansUsed = scans };
     }
 
     object DoIdentify(JObject body)

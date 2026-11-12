@@ -12,8 +12,6 @@ interface CreatedUser {
   createdAt: string;
 }
 
-const SCAN_CHOICES = [3, 4, 5, 6];
-
 function explain(err: unknown): string {
   if (!(err instanceof ApiError)) return "Couldn't reach the access service. Check that it is running.";
   const reason = (err.data as { reason?: string } | null)?.reason;
@@ -33,6 +31,9 @@ function explain(err: unknown): string {
         ? `This fingerprint is already enrolled as ${who}. Each finger can belong to only one person. Use a different finger, or delete ${who} first.`
         : "This fingerprint is already enrolled. Each finger can belong to only one person.";
     }
+    case "DUPLICATE_FINGER_IN_BATCH": {
+      return err.message;
+    }
     default:
       return err.message;
   }
@@ -43,7 +44,6 @@ export default function Enroll() {
 
   const [name, setName] = useState("");
   const [role, setRole] = useState("user");
-  const [scans, setScans] = useState(4);
 
   const [phase, setPhase] = useState<Phase>("form");
   const [error, setError] = useState<string | null>(null);
@@ -61,7 +61,14 @@ export default function Enroll() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!name.trim()) return;
+
+    // Ensure at least two words (First and Last name)
+    const parts = name.trim().split(/\s+/);
+    if (parts.length < 2) {
+      setError("Please enter a full name (First and Last name).");
+      setPhase("error");
+      return;
+    }
 
     setElapsed(0);
     setError(null);
@@ -70,7 +77,7 @@ export default function Enroll() {
     try {
       const res = await api<{ user: CreatedUser; scansUsed: number }>("/users/enroll", {
         method: "POST",
-        body: { name: name.trim(), role, scans },
+        body: { name: name.trim(), role },
       });
       setCreated(res.user);
       setPhase("done");
@@ -83,7 +90,6 @@ export default function Enroll() {
   function reset() {
     setName("");
     setRole("user");
-    setScans(4);
     setCreated(null);
     setError(null);
     setPhase("form");
@@ -123,23 +129,10 @@ export default function Enroll() {
           </label>
 
           <div className="field">
-            <span className="field-label" id="scan-label">
-              Number of scans
-            </span>
-            <div className="segmented" role="group" aria-labelledby="scan-label">
-              {SCAN_CHOICES.map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  className={scans === n ? "is-on" : ""}
-                  aria-pressed={scans === n}
-                  onClick={() => setScans(n)}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
-            <span className="hint">More scans make a more reliable match. Four is a good balance.</span>
+            <span className="field-label">Capture Process</span>
+            <p className="hint" style={{ marginTop: "0.25rem", marginBottom: "1.25rem" }}>
+              For security, the system will prompt you to scan <strong>all 10 fingers</strong> one by one. This ensures the person's full biometric profile is registered.
+            </p>
           </div>
 
           <p className="hint" style={{ marginBottom: "1.25rem" }}>
@@ -160,16 +153,22 @@ export default function Enroll() {
             <div>
               <h2>Scanning {name}</h2>
               <p className="hint num">
-                {scans} scans, {elapsed} s elapsed
+                10 scans, {elapsed} s elapsed
               </p>
             </div>
           </div>
           <ol className="steps">
-            <li>First, one scan checks that this finger isn't already enrolled.</li>
             <li>A small "Scanner ready" window appears in the bottom-right corner of the screen.</li>
-            <li>Press the finger flat on the glass and hold it for about two seconds.</li>
-            <li>Lift it completely, then place the same finger again when the window reappears.</li>
-            <li>Repeat until all {scans} scans are done. This page updates by itself.</li>
+            <li>Place your <strong>Right Thumb</strong> on the glass, hold for 2 seconds, then lift.</li>
+            <li>Place your <strong>Right Index</strong> finger, then lift.</li>
+            <li>Place your <strong>Right Middle</strong> finger, then lift.</li>
+            <li>Place your <strong>Right Ring</strong> finger, then lift.</li>
+            <li>Place your <strong>Right Pinky</strong> finger, then lift.</li>
+            <li>Place your <strong>Left Thumb</strong> on the glass, then lift.</li>
+            <li>Place your <strong>Left Index</strong> finger, then lift.</li>
+            <li>Place your <strong>Left Middle</strong> finger, then lift.</li>
+            <li>Place your <strong>Left Ring</strong> finger, then lift.</li>
+            <li>Place your <strong>Left Pinky</strong> finger, then lift. Done.</li>
           </ol>
         </div>
       )}

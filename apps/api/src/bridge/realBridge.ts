@@ -58,10 +58,9 @@ export const realBridge: BridgeClient = {
   },
 
   async enroll(scans: number): Promise<EnrollResult> {
-    // Each scan can take up to ~40 s including the pause between scans.
     const r = await call("/enroll", "POST", { scans }, scans * 40_000 + 10_000);
     if (!r.ok) return { ok: false, error: mapError(r.error) };
-    return { ok: true, fmd: r.fmd, scansUsed: r.scansUsed ?? scans };
+    return { ok: true, fmds: r.fmds, scansUsed: r.scansUsed ?? scans };
   },
 
   async identify(probe, candidates): Promise<IdentifyResult> {

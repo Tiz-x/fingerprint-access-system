@@ -11,7 +11,7 @@ export type CaptureResult =
   | { ok: false; error: BridgeErrorCode };
 
 export type EnrollResult =
-  | { ok: true; fmd: string; scansUsed: number }
+  | { ok: true; fmds: string[]; scansUsed: number }
   | { ok: false; error: BridgeErrorCode | "SCANS_MISMATCH" };
 
 export type IdentifyResult =
